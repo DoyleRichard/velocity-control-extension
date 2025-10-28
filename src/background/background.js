@@ -2,7 +2,6 @@
 chrome.commands.onCommand.addListener(async (command) => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    
     if (!tab) return
     
     let message
@@ -19,11 +18,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
     
     if (message) {
-      chrome.tabs.sendMessage(tab.id, message, (response) => {
-        if (response && response.success) {
-          console.log(`Command ${command} executed successfully`)
-        }
-      })
+      chrome.tabs.sendMessage(tab.id, message)
     }
   } catch (error) {
     console.error('Error executing command:', error)

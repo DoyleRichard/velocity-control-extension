@@ -1,212 +1,330 @@
 <template>
-  <div id="app" class="velocity-control-popup">
-    <el-container class="popup-container">
-      <el-header height="auto" class="popup-header">
-        <h3>Velocity Control</h3>
-        <el-text type="info" size="small">当前倍速: {{ currentSpeed }}x</el-text>
-      </el-header>
-      
-      <el-main class="popup-main">
-        <!-- 滑块控制 -->
-        <div class="control-section">
-          <el-text class="control-label">倍速调节</el-text>
-          <el-slider
-            v-model="speed"
-            :min="minSpeed"
-            :max="maxSpeed"
-            :step="0.1"
-            :format-tooltip="formatSpeed"
-            @change="handleSpeedChange"
-            show-stops
-            :marks="speedMarks"
-          />
-        </div>
-        
-        <!-- 预设按钮 -->
-        <div class="control-section">
-          <el-text class="control-label">常用倍速</el-text>
-          <div class="preset-buttons">
-            <el-button
-              v-for="preset in presetSpeeds"
-              :key="preset"
-              :type="speed === preset ? 'primary' : 'default'"
-              @click="setSpeed(preset)"
-              size="small"
-            >
-              {{ preset }}x
-            </el-button>
+  <div id="app" class="velocity-control-app">
+    <!-- header -->
+    <header class="app-header">
+      <div class="logo">
+        <i class="el-icon-video-play"></i>
+        <span class="app-name">Velocity Control</span>
+      </div>
+      <div class="header-actions">
+        <el-tag v-if="videoCount > 0" type="success" size="small">检测到{{ videoCount }}个视频</el-tag>
+
+        <!-- 新增：刷新按钮（美化样式） -->
+        <el-button
+          class="refresh-btn"
+          type="text"
+          size="small"
+          @click="refreshVideos"
+          title="刷新视频列表"
+          aria-label="刷新视频列表"
+        >
+          <i class="el-icon-refresh"></i>
+          <span class="refresh-label">检测</span>
+        </el-button>
+      </div>
+    </header>
+
+    <!-- main -->
+    <main class="app-main">
+      <!-- current speed -->
+      <section class="speed-panel">
+        <div class="speed-left">
+          <div class="speed-value">
+            <span class="value-number">{{ currentSpeed.toFixed(2) }}</span>
+            <span class="value-unit">x</span>
           </div>
+           <div class="speed-label">当前速度</div>
+         </div>
+        <el-progress
+          class="speed-progress"
+          :percentage="speedPercentage"
+          :stroke-width="10"
+          :show-text="false"
+          :color="progressColor"
+        />
+      </section>
+
+      <!-- slider -->
+      <section class="control-section">
+        <div class="section-title"><i class="el-icon-set-up"></i><span>精确控制</span></div>
+        <el-slider
+          v-model="speed"
+          :min="minSpeed"
+          :max="maxSpeed"
+          :step="0.1"
+          :format-tooltip="formatSpeed"
+          @change="handleSpeedChange"
+          :marks="speedMarks"
+          class="compact-slider"
+        />
+      </section>
+
+      <!-- presets (single row, numbers only) -->
+      <section class="control-section presets-section" aria-label="预设速度">
+        <div class="section-title"><i class="el-icon-magic-stick"></i><span>预设速度</span></div>
+        <div class="presets-grid">
+          <el-button
+            v-for="value in presetSpeeds"
+            :key="value"
+            :type="speed === value ? 'primary' : 'default'"
+            class="preset-btn"
+            @click="setSpeed(value)"
+            size="small"
+          >
+            {{ value }}x
+          </el-button>
         </div>
-        
-        <!-- 精确输入 -->
-        <div class="control-section">
-          <el-text class="control-label">精确设置</el-text>
-          <div class="input-control">
-            <el-input-number
-              v-model="speed"
-              :min="minSpeed"
-              :max="maxSpeed"
-              :step="0.1"
-              size="small"
-              @change="handleSpeedChange"
-            />
-            <el-button @click="resetSpeed" type="info" size="small">重置</el-button>
-          </div>
-        </div>
-        
-        <!-- 快捷键提示 -->
-        <el-collapse class="shortcut-hint">
-          <el-collapse-item title="快捷键提示">
-            <div>加速: Ctrl + ↑</div>
-            <div>减速: Ctrl + ↓</div>
-            <div>重置: Ctrl + Shift + 0</div>
-          </el-collapse-item>
-        </el-collapse>
-      </el-main>
-    </el-container>
+      </section>
+    </main>
+
+    <!-- footer -->
+    <footer class="app-footer">
+      <div class="shortcuts">
+        <span class="kbd"><kbd>Ctrl</kbd>↑</span>
+        <span class="kbd"><kbd>Ctrl</kbd>↓</span>
+        <span class="kbd"><kbd>Ctrl</kbd>Shift 0</span>
+      </div>
+    </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus' // 用于轻提示（toast）
 
-// 响应式数据
+// 状态与配置
 const speed = ref(1.0)
 const currentSpeed = ref(1.0)
+const videoCount = ref(0)
 const minSpeed = ref(0.1)
-const maxSpeed = ref(5.0)
+const maxSpeed = ref(32.0)
 
-// 预设速度
-const presetSpeeds = ref([0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0])
+// 预设：仅倍率（保持一行显示）
+const presetSpeeds = ref([0.1, 0.2, 3.0, 5.0, 10.0])
 
-// 滑块标记
+// UI 计算属性
+const speedPercentage = computed(() => {
+  return ((speed.value - minSpeed.value) / (maxSpeed.value - minSpeed.value)) * 100
+})
+const progressColor = computed(() => {
+  if (speed.value < 1.0) return '#67C23A'
+  if (speed.value < 2.0) return '#409EFF'
+  return '#E6A23C'
+})
 const speedMarks = computed(() => {
   const marks = {}
-  presetSpeeds.value.forEach(preset => {
-    marks[preset] = preset + 'x'
-  })
+  // 仅在 1.0 处显示标记
+  presetSpeeds.value.forEach(v => { if (v === 1.0) marks[v] = { label: '1.0x' } })
   return marks
 })
+const formatSpeed = (v) => `${v.toFixed(1)}x`
 
-// 格式化速度显示
-const formatSpeed = (value) => {
-  return `${value.toFixed(1)}x`
-}
-
-// 设置速度
+// 行为：设置/重置/调整速度
 const setSpeed = async (newSpeed) => {
   speed.value = newSpeed
-  await applySpeedToPage(newSpeed)
+  const ok = await applySpeedToPage(newSpeed)
+  if (ok) showToast('success', `速度已设置为 ${newSpeed}x`)
 }
-
-// 重置速度
-const resetSpeed = () => {
-  setSpeed(1.0)
+const resetSpeed = () => setSpeed(1.0)
+const adjustSpeed = (delta) => {
+  const n = Math.min(Math.max(speed.value + delta, minSpeed.value), maxSpeed.value)
+  setSpeed(parseFloat(n.toFixed(2)))
 }
+const handleSpeedChange = async (val) => { if (val !== null) await applySpeedToPage(val) }
 
-// 处理速度变化
-const handleSpeedChange = async (newSpeed) => {
-  if (newSpeed !== null) {
-    await applySpeedToPage(newSpeed)
-  }
-}
-
-// 应用速度到页面
+// 与页面通信：发送消息到 content script
 const applySpeedToPage = async (speedValue) => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      action: 'setSpeed',
-      speed: speedValue
-    })
-    
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'setSpeed', speed: speedValue })
     if (response && response.success) {
       currentSpeed.value = speedValue
+      videoCount.value = response.videoCount || 0
+      return true
     }
-  } catch (error) {
-    console.error('Failed to set speed:', error)
-    // 处理错误，例如内容脚本未加载
-    ElMessage.error('无法连接到页面，请刷新页面后重试')
+  } catch (e) {
+    console.error(e)
+    showToast('error', '无法连接到页面，请刷新后重试')
   }
+  return false
 }
 
-// 获取当前速度
 const getCurrentSpeed = async () => {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      action: 'getSpeed'
-    })
-    
-    if (response && response.speed) {
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'getSpeed' })
+    if (response && typeof response.speed === 'number') {
       speed.value = response.speed
       currentSpeed.value = response.speed
+      videoCount.value = response.videoCount || 0
     }
-  } catch (error) {
-    console.error('Failed to get current speed:', error)
+  } catch (e) {
+    videoCount.value = 0
   }
 }
 
-// 生命周期
-onMounted(() => {
-  getCurrentSpeed()
-})
+// 重新在页面中查找 video 元素（由 popup 触发）
+const refreshVideos = async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab) throw new Error('no active tab')
+    const response = await chrome.tabs.sendMessage(tab.id, { action: 'detectVideos' })
+    if (response && typeof response.speed === 'number') {
+      speed.value = response.speed
+      currentSpeed.value = response.speed
+      videoCount.value = response.videoCount || 0
+      showToast('success', '已刷新视频列表')
+      return
+    }
+  } catch (e) {
+    console.error(e)
+    showToast('error', '刷新失败，请刷新页面后重试')
+  }
+}
+
+// 轻提示：替代原来的 modal 状态弹窗
+const showToast = (type, message) => {
+  // type: 'success' | 'error' | 'info' | 'warning'
+  ElMessage({
+    message,
+    type: type === 'error' ? 'error' : 'success',
+    duration: 1400
+  })
+}
+
+watch(speed, (v) => { currentSpeed.value = v })
+onMounted(() => getCurrentSpeed())
 </script>
 
 <style scoped>
-.velocity-control-popup {
-  width: 320px;
-  min-height: 400px;
-}
-
-.popup-container {
-  padding: 0;
-}
-
-.popup-header {
-  text-align: center;
-  padding: 16px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.popup-header h3 {
-  margin: 0 0 8px 0;
-  color: #409eff;
-}
-
-.popup-main {
-  padding: 16px;
-}
-
-.control-section {
-  margin-bottom: 20px;
-}
-
-.control-label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.preset-buttons {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.input-control {
+/* 容器与配色（固定高度，避免纵向滚动） */
+.velocity-control-app {
+  width: 360px;
+  height: 520px;
   display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(180deg,#f7fbff 0%, #eef4ff 100%);
+  color: #17212b;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  box-shadow: 0 12px 30px rgba(10,20,40,0.08);
 }
 
-.shortcut-hint {
-  margin-top: 20px;
+/* header */
+.app-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 14px;
+  background:rgba(255,255,255,0.95);
+  border-bottom:1px solid rgba(15,23,42,0.04);
+  flex:0 0 52px;
+}
+.logo { display:flex; align-items:center; gap:10px; font-weight:600; }
+.logo .el-icon-video-play { color:#409EFF; font-size:18px; }
+.app-name { font-size:14px; color:#0f2430; }
+.header-actions { display:flex; align-items:center; gap:8px; }
+
+/* 主体 */
+.app-main {
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  flex:1 1 auto;
+  overflow:hidden;
 }
 
-:deep(.el-slider__marks-text) {
-  font-size: 10px;
-  transform: translateX(-50%) rotate(-45deg);
-  white-space: nowrap;
+/* 当前速度卡片 */
+.speed-panel {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px;
+  border-radius:12px;
+  background: linear-gradient(90deg,#ffffff 0%, #f7fbff 100%);
+  box-shadow:0 8px 20px rgba(16,30,60,0.04);
+}
+.speed-left { display:flex; flex-direction:column; gap:2px; }
+.speed-value {
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+}
+.value-number {
+  font-size:34px;
+  font-weight:800;
+  background: linear-gradient(90deg,#2f80ed,#7b61ff);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  line-height:1;
+  letter-spacing: -0.5px;
+}
+.value-unit {
+  font-size:14px;
+  color:#4b5964;
+  font-weight:700;
+  margin-bottom:6px;
+}
+.speed-label { font-size:12px; color:#556066; }
+.speed-progress { min-width:120px; width:42%; }
+
+/* 控制区通用 */
+.control-section { display:flex; flex-direction:column; gap:8px; padding:8px; border-radius:10px; background:rgba(255,255,255,0.96); box-shadow:0 6px 18px rgba(14,31,80,0.03); }
+.section-title { display:flex; align-items:center; gap:8px; font-weight:600; color:#22313a; font-size:13px; }
+
+/* 滑块视觉微调 */
+.compact-slider :deep(.el-slider__bar) { height:6px; border-radius:6px; background:linear-gradient(90deg,#67C23A,#409EFF,#E6A23C); }
+.compact-slider :deep(.el-slider__button) { width:14px; height:14px; box-shadow:0 2px 6px rgba(64,158,255,0.12); }
+
+/* 预设：单行布局，按钮风格优化 */
+.presets-section .presets-grid {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:space-between;
+  width:100%;
+}
+.preset-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height:44px;
+  border-radius:10px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 8px;
+  background:#ffffff;
+  border:1px solid rgba(15,23,42,0.06);
+  color:#12232e;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.preset-btn:hover { transform: translateY(-4px); box-shadow:0 10px 24px rgba(16,30,60,0.06); }
+:deep(.el-button--primary.preset-btn) {
+  background: linear-gradient(90deg,#409EFF,#67C23A);
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 10px 28px rgba(64,158,255,0.12);
+}
+
+/* footer 简洁展示快捷键 */
+.app-footer {
+  flex:0 0 56px;
+  padding:8px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border-top:1px solid rgba(15,23,42,0.02);
+}
+.shortcuts { display:flex; gap:10px; color:#5b6b77; font-size:12px; }
+.kbd kbd { background:#f5f7fa; border:1px solid rgba(15,23,42,0.04); padding:2px 6px; border-radius:4px; font-family:monospace; }
+
+/* 小屏保障（不产生纵向滚动条） */
+@media (max-height:540px) {
+  .velocity-control-app { height:500px; }
+  .presets-section .presets-grid { gap:6px; }
 }
 </style>
