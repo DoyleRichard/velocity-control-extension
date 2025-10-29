@@ -4,10 +4,10 @@
     <header class="app-header">
       <div class="logo">
         <i class="el-icon-video-play"></i>
-        <span class="app-name">Velocity Control</span>
+        <span class="app-name">视频速率控制器</span>
       </div>
       <div class="header-actions">
-        <el-tag v-if="videoCount > 0" type="success" size="small">检测到{{ videoCount }}个视频</el-tag>
+        <el-tag v-if="videoCount > 0" type="success" size="small">{{ videoCount }}个视频</el-tag>
 
         <!-- 新增：刷新按钮（美化样式） -->
         <el-button
@@ -20,6 +20,18 @@
         >
           <i class="el-icon-refresh"></i>
           <span class="refresh-label">检测</span>
+        </el-button>
+
+        <!-- 新增：重置倍速按钮 -->
+        <el-button
+          class="reset-btn"
+          type="text"
+          size="small"
+          @click="resetSpeed"
+          title="恢复到常规速度"
+          aria-label="恢复到常规速度"
+        >
+          重置
         </el-button>
       </div>
     </header>
@@ -82,7 +94,7 @@
       <div class="shortcuts">
         <span class="kbd"><kbd>Ctrl</kbd>↑</span>
         <span class="kbd"><kbd>Ctrl</kbd>↓</span>
-        <span class="kbd"><kbd>Ctrl</kbd>Shift 0</span>
+        <span class="kbd"><kbd>Ctrl Shift</kbd>0</span>
       </div>
     </footer>
   </div>
@@ -321,6 +333,44 @@ onMounted(() => getCurrentSpeed())
 }
 .shortcuts { display:flex; gap:10px; color:#5b6b77; font-size:12px; }
 .kbd kbd { background:#f5f7fa; border:1px solid rgba(15,23,42,0.04); padding:2px 6px; border-radius:4px; font-family:monospace; }
+
+/* 刷新按钮视觉调整：蓝色为主，带圆角背景、hover 效果 */
+.refresh-btn {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color: #1f6feb;
+  border-radius: 8px;
+  padding: 6px 8px;
+  transition: background .12s ease, transform .08s ease;
+  background: transparent;
+}
+.refresh-btn .el-icon-refresh { font-size: 14px; color: inherit; }
+.refresh-btn .refresh-label {
+  font-size: 12px;
+  color: inherit;
+  font-weight: 600;
+  line-height: 1;
+}
+.refresh-btn:hover {
+  background: rgba(31,111,235,0.06);
+  transform: translateY(-2px);
+}
+
+/* 新增：重置按钮样式（醒目但不突兀） */
+.reset-btn {
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(90deg, #ff6b6b, #ff3b30);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 14px rgba(255,59,48,0.12);
+  transition: transform .08s ease, box-shadow .12s ease;
+}
+.reset-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255,59,48,0.16);
+}
 
 /* 小屏保障（不产生纵向滚动条） */
 @media (max-height:540px) {

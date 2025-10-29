@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Velocity Control",
+  "name": "Velocity Control 视频速率控制器",
   "version": "1.0.0",
-  "description": "Control playback speed of any HTML5 video with Vue 3 + Element Plus",
+  "description": "Control playback speed of any HTML5 video",
   
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "Velocity Control"
+    "default_title": "视频速率控制器"
   },
   
   "content_scripts": [
