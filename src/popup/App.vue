@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus' // 用于轻提示（toast）
 
 // 状态与配置
@@ -177,6 +177,7 @@ const getCurrentSpeed = async () => {
 
 // 重新在页面中查找 video 元素（由 popup 触发）
 const refreshVideos = async () => {
+  console.log('refreshVideos')
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!tab) throw new Error('no active tab')
@@ -205,7 +206,26 @@ const showToast = (type, message) => {
 }
 
 watch(speed, (v) => { currentSpeed.value = v })
-onMounted(() => getCurrentSpeed())
+
+// 简单防抖实现
+function debounce(fn, delay) {
+  let timer = null
+  return function (...args) {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => fn.apply(this, args), delay)
+  }
+}
+
+const handleFocus = debounce(refreshVideos, 300)
+
+onMounted(() => {
+  getCurrentSpeed()
+  window.addEventListener('focus', handleFocus)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', handleFocus)
+})
 </script>
 
 <style scoped>
