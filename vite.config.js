@@ -8,7 +8,7 @@ export default defineConfig({
     webExtension({
       manifest: './manifest.json',
       watchFilePaths: ['src/**/*', 'manifest.json']
-    })
+    }),
   ],
   build: {
     outDir: 'dist'
